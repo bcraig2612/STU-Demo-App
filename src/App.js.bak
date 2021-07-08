@@ -1,0 +1,77 @@
+import React, {useEffect, useState} from 'react';
+import {
+  useHistory,
+  useParams
+} from "react-router-dom";
+import { SnackbarProvider } from 'notistack';
+import Pusher from 'pusher-js';
+import {useQuery} from "./customHooks";
+import ConversationList from './components/ConversationList';
+import Layout from "./components/Layout";
+import ConversationMain from "./components/ConversationMain";
+
+function App() {
+  let query = useQuery();
+  let { conversationID } = useParams();
+  const history = useHistory();
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [filter, setFilter] = useState('open');
+  const queryFilter = query.get('filter') ? query.get('filter') : 'open';
+
+  useEffect(() => {
+    setFilter(queryFilter);
+  }, [queryFilter]);
+
+  useEffect(() => {
+    setConversationsLoading(true);
+    // make call to api to get conversation
+    fetch('http://localhost:9000/api/dummy_data.php?conversation=1')
+      .then(response => response.json())
+      .then(data => {
+        console.log('loading conversations..')
+        setConversations(data.conversations);
+        setConversationsLoading(false);
+      });
+
+    // connect to pusher
+    // set up pusher
+    Pusher.logToConsole = true;
+    const pusher = new Pusher('66e7f1b4416d81db9385', {
+      cluster: 'us3'
+    });
+
+    // subscribe to inbox notifications
+    let channel = pusher.subscribe('inbox-notifications');
+
+    // new conversation notifications
+    channel.bind('new-conversation', function(data) {
+      history.push('/conversation/' + data.id + '?filter=open');
+    });
+  }, []);
+
+  useEffect(() => {
+    setSelectedConversation(conversationID);
+  }, [conversationID]);
+
+  useEffect(() => {
+    if (! selectedConversation) {
+      return;
+    }
+
+  }, [selectedConversation]);
+
+  return (
+    <SnackbarProvider maxSnack={3}>
+      {console.count('app')}
+
+      <Layout>
+        <ConversationList conversationsLoading={conversationsLoading} conversations={conversations} setFilter={setFilter} filter={filter} selectedConversation={selectedConversation} />
+        <ConversationMain conversations={conversations} selectedConversation={selectedConversation} />
+      </Layout>
+    </SnackbarProvider>
+  );
+}
+
+export default App;
